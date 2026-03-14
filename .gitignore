@@ -1,0 +1,13 @@
+# TTN credentials — never commit these
+tc.key
+tc.uri
+tc.trust
+
+# Build artifacts
+*.o
+*.a
+sx1301_softreset
+
+# Editor
+.vscode/
+*.swp

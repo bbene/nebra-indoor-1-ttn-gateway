@@ -1,0 +1,17 @@
+[Unit]
+Description=TTN LoRa Basics Station
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ttn-station
+ExecStart=/opt/ttn-station/start.sh
+PrivateTmp=false
+Restart=on-failure
+RestartSec=10
+SyslogIdentifier=ttn-station
+
+[Install]
+WantedBy=multi-user.target
