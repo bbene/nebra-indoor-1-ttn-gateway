@@ -1,6 +1,6 @@
-# Nebra Indoor Gen 1 → TTN LoRaWAN Gateway
+# Nebra Indoor Gen 1 → LoRaWAN Gateway
 
-Repurposes a **Nebra Indoor Hotspot Gen 1** (the original CM3-based Helium miner) as a [LoRa Basics Station](https://github.com/lorabasics/basicstation) gateway connected to [The Things Network](https://www.thethingsnetwork.org/).
+Repurposes a **Nebra Indoor Hotspot Gen 1** (the original CM3-based Helium miner) as a [LoRa Basics Station](https://github.com/lorabasics/basicstation) gateway. Supports [The Things Network](https://www.thethingsnetwork.org/) and [ChirpStack](https://www.chirpstack.io/).
 
 ## Hardware
 
@@ -140,6 +140,90 @@ Debian 13 on the CM3 runs 64-bit aarch64, but basicstation's `setup.gmk` only li
 ### 7. The SSL drop on INFOS connection is normal
 
 Basics Station connects to an INFOS endpoint first to receive the MUXS redirect URL. TTN closes this connection after responding — the `Recv failed: SSL` log entry is expected protocol behavior, not an authentication failure. The gateway connects to MUXS immediately after.
+
+## Using with ChirpStack
+
+All the hardware bring-up work in this repo — the soft reset, `spidev1.2`, `LORAGW_SPI`, 1 MHz SPI speed, the aarch64 build patch — applies identically to ChirpStack. Only the server connection files need to change.
+
+### Option A — Basics Station (recommended)
+
+ChirpStack v4 includes a built-in Basics Station gateway bridge. This is the cleanest approach since the station binary and `station.conf` are already working.
+
+**1. In ChirpStack, enable the Basics Station gateway backend** and note the endpoint — it will be something like:
+
+```
+wss://YOUR-CHIRPSTACK-HOST:3001
+```
+
+**2. Stop the TTN service:**
+```bash
+sudo systemctl stop ttn-station
+```
+
+**3. Replace `tc.uri`:**
+```bash
+echo "wss://YOUR-CHIRPSTACK-HOST:3001" > /opt/ttn-station/tc.uri
+```
+
+**4. Replace `tc.trust` with your ChirpStack server's CA cert:**
+```bash
+# If using a self-signed cert, copy it from your ChirpStack server:
+scp user@chirpstack-host:/path/to/ca.crt /opt/ttn-station/tc.trust
+
+# If using Let's Encrypt on ChirpStack:
+curl -o /opt/ttn-station/tc.trust https://letsencrypt.org/certs/isrgrootx1.pem
+```
+
+**5. Replace `tc.key` with your ChirpStack gateway API key:**
+```bash
+printf "Authorization: Bearer YOUR-CHIRPSTACK-GATEWAY-KEY\n" > /opt/ttn-station/tc.key
+```
+
+**6. Restart:**
+```bash
+sudo systemctl start ttn-station
+journalctl -u ttn-station -f
+```
+
+### Option B — Semtech UDP Packet Forwarder
+
+If you prefer the older UDP forwarder (simpler, no TLS, works with ChirpStack v3 and v4):
+
+**1. Install the packet forwarder dependencies:**
+```bash
+sudo apt install -y git build-essential
+```
+
+**2. Clone and build:**
+```bash
+git clone https://github.com/Lora-net/packet_forwarder.git
+git clone https://github.com/Lora-net/lora_gateway.git
+cd packet_forwarder
+make
+```
+
+**3. Configure `global_conf.json`** with the US915 FSB2 channel plan and point `server_address` at your ChirpStack gateway bridge (default port 1700).
+
+**4. The same hardware requirements still apply** — you must run `sx1301_softreset` before starting the packet forwarder, and set `LORAGW_SPI=/dev/spidev1.2` and `LORAGW_SPI_SPEED=1000000`.
+
+A minimal wrapper script:
+```bash
+#!/bin/bash
+/opt/ttn-station/sx1301_softreset || exit 1
+sleep 0.5
+exec env LORAGW_SPI=/dev/spidev1.2 \
+         LORAGW_SPI_SPEED=1000000 \
+         ./lora_pkt_fwd
+```
+
+### Switching back to TTN
+
+```bash
+echo "wss://nam1.cloud.thethings.network:8887" > /opt/ttn-station/tc.uri
+curl -o /opt/ttn-station/tc.trust https://letsencrypt.org/certs/isrgrootx1.pem
+printf "Authorization: Bearer NNSXS.YOUR-TTN-KEY\n" > /opt/ttn-station/tc.key
+sudo systemctl restart ttn-station
+```
 
 ## Troubleshooting
 
