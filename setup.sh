@@ -149,7 +149,7 @@ mkdir -p "$INSTALL_DIR"
 
 gcc -O2 -o "$INSTALL_DIR/sx1301_softreset" "$SCRIPT_DIR/src/sx1301_softreset.c"
 chmod +x "$INSTALL_DIR/sx1301_softreset"
-success "Built sx1301_softreset"
+success "Built sx1301_softreset (GPIO 38 hardware reset)"
 
 # =============================================================================
 # STEP 5 — Build LoRa Basics Station
@@ -219,29 +219,11 @@ success "Wrote tc.trust"
 # =============================================================================
 header "Writing Startup Script"
 
-cat > "$INSTALL_DIR/start.sh" <<EOF
-#!/bin/bash
-# Nebra Indoor Gen 1 — TTN Basics Station startup script
-
-# SPI soft reset — required after every power-up
-${INSTALL_DIR}/sx1301_softreset
-if [ \$? -ne 0 ]; then
-    echo "ERROR: SX1301 soft reset failed — is spidev1.2 available?"
-    exit 1
-fi
-
-sleep 0.5
-
-# LORAGW_SPI: the SX1301 HAL reads this env var (not RADIODEV)
-# LORAGW_SPI_SPEED: 1MHz required — 8MHz default is unreliable on SPI1
-exec env LORAGW_SPI=/dev/spidev1.2 \\
-         LORAGW_SPI_SPEED=1000000 \\
-         ${STATION_BIN} \\
-         --home ${INSTALL_DIR}
-EOF
-
+# Substitute the actual station binary path into start.sh
+sed "s|STATION_BIN  = \".*\"|STATION_BIN  = \"${STATION_BIN}\"|" \
+    "$SCRIPT_DIR/start.sh" > "$INSTALL_DIR/start.sh"
 chmod +x "$INSTALL_DIR/start.sh"
-success "Wrote start.sh"
+success "Wrote start.sh (LED + button + GPIO reset)"
 
 # =============================================================================
 # STEP 8 — Install systemd service
