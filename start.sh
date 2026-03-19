@@ -85,7 +85,7 @@ def button_thread(chip_path):
         press_start = None
         while not stop_event.is_set():
             val = btn.get_value(BUTTON_PIN)
-            if val == Value.ACTIVE:
+            if val == Value.INACTIVE:  # PULL_UP: INACTIVE = button pressed (pulled to GND)
                 if press_start is None:
                     press_start = time.monotonic()
                 elif time.monotonic() - press_start >= BUTTON_HOLD_SECS:
@@ -146,7 +146,7 @@ def main():
     lt = threading.Thread(target=led_thread,  args=(chip_path,), daemon=True)
     bt = threading.Thread(target=button_thread, args=(chip_path,), daemon=True)
     lt.start()
-    # bt.start()  # Disable button for now (GPIO 26 floating, causing false triggers)
+    bt.start()
 
     def shutdown(sig, frame):
         print("\n[SYS] Shutting down...")
