@@ -8,5 +8,16 @@ services:
       - /dev/spidev1.2
       - /dev/gpiochip0
     environment:
+      # Network server choice: "ttn" (default) or "chirpstack"
+      - NETWORK_SERVER
+
+      # For TTN (NETWORK_SERVER=ttn)
       - TTN_CLUSTER
       - TTN_API_KEY
+      # - TTN_TRUST  # Optional: custom CA cert
+
+      # For ChirpStack (NETWORK_SERVER=chirpstack)
+      # - CHIRPSTACK_URL
+      # - CHIRPSTACK_API_TOKEN
+      # - CHIRPSTACK_MQTT_PORT  # Optional: defaults to 1883
+      # - CHIRPSTACK_TRUST  # Optional: custom CA cert
