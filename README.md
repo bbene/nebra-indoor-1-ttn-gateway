@@ -16,8 +16,10 @@ Repurposes a **Nebra Indoor Hotspot Gen 1** (the original CM3-based Helium miner
 ## Prerequisites
 
 - Nebra Indoor Hotspot Gen 1 (CM3-based, **not** the Rock Pi version)
-- A TTN account with a registered gateway and LNS API key
 - Internet connection on the device
+- **One of:**
+  - A [TTN account](https://www.thethingsnetwork.org/) with a registered gateway and LNS API key, **OR**
+  - A [ChirpStack](https://www.chirpstack.io/) instance with API access and an API token
 
 ### For Bare-Metal Deployment
 
@@ -76,7 +78,11 @@ The container will:
 - Access `/dev/spidev1.2` (SPI) and `/dev/gpiochip0` (GPIO) from the host
 - Run the Python launcher with full hardware control
 
-## TTN Console Setup
+## Network Server Setup
+
+This gateway is compatible with **The Things Network (TTN)** and **ChirpStack**. Choose one:
+
+### The Things Network (TTN)
 
 Before running the script, register your gateway in the [TTN Console](https://console.cloud.thethings.network):
 
@@ -98,6 +104,39 @@ Before running the script, register your gateway in the [TTN Console](https://co
    - Go to your gateway → API Keys → Add API Key
    - Grant right: **Link as Gateway to a Gateway Server for traffic exchange**
    - Copy the key — you cannot view it again
+
+### ChirpStack (Self-Hosted Alternative)
+
+Use this setup with a self-hosted [ChirpStack](https://www.chirpstack.io/) network server instead of TTN:
+
+#### Bare-Metal Setup
+
+When running `setup.sh`, you'll be prompted for:
+- **Network server choice:** Select ChirpStack
+- **ChirpStack server URL:** e.g., `https://chirpstack.example.com` (your ChirpStack API endpoint)
+- **ChirpStack API token:** Generate in ChirpStack admin panel → Gateways
+
+The setup script will:
+1. Register or update the gateway in ChirpStack via API
+2. Write the ChirpStack connection details to `/opt/ttn-station/tc.uri` and `/opt/ttn-station/tc.key`
+3. Configure Basics Station for ChirpStack's MQTT bridge
+
+#### Docker + balena Setup
+
+When deploying via balena, set these environment variables instead:
+
+| Variable | Value | Scope |
+|----------|-------|-------|
+| `NETWORK_SERVER` | `chirpstack` | Fleet |
+| `CHIRPSTACK_URL` | `https://chirpstack.example.com` | Fleet |
+| `CHIRPSTACK_API_TOKEN` | Your ChirpStack API token | **Device** (per-device secret) |
+
+The `docker-entrypoint.sh` will detect `NETWORK_SERVER=chirpstack` and configure the connection accordingly.
+
+**Note:** ChirpStack's Basics Station integration requires the gateway to connect via MQTT. Ensure your ChirpStack instance has:
+- MQTT broker running (usually integrated)
+- Gateway bridge service enabled
+- Network server configured to accept Basics Station gateways
 
 ## Monitoring
 
@@ -157,6 +196,22 @@ The setup script writes the following to `/opt/ttn-station/`:
 ### Container Runtime (balena)
 
 The Dockerfile creates the same structure inside the container at `/opt/ttn-station/`, with credentials written by `docker-entrypoint.sh` from environment variables at startup.
+
+## Network Server Compatibility
+
+The setup is designed to be **provider-agnostic**. Basics Station is a reference gateway implementation that connects to any LoRaWAN network server via standardized protocols:
+
+- **TTN (Default):** Uses TTN's LNS API (WebSocket over TLS)
+- **ChirpStack:** Uses MQTT bridge for native integration
+- **Other servers:** Any server supporting Basics Station can be configured by:
+  1. Modifying `docker-entrypoint.sh` to detect your server type
+  2. Setting appropriate `tc.uri` (server endpoint) and `tc.key` (credentials)
+  3. Adjusting `config/station.conf` if regional/frequency settings differ
+
+To add support for another network server:
+- Fork this repo
+- Update `setup.sh` or `docker-entrypoint.sh` to handle your server's auth scheme
+- Document the configuration in this README
 
 ## Non-Obvious Hardware Quirks
 
