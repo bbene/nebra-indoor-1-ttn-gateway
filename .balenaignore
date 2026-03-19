@@ -1,0 +1,7 @@
+tc.key
+tc.uri
+tc.trust
+*.pid
+setup.sh
+systemd/
+.DS_Store

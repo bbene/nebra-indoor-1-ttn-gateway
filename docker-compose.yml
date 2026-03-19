@@ -1,0 +1,12 @@
+version: "2.1"
+services:
+  ttn-gateway:
+    build: .
+    privileged: true
+    restart: always
+    devices:
+      - /dev/spidev1.2
+      - /dev/gpiochip0
+    environment:
+      - TTN_CLUSTER
+      - TTN_API_KEY

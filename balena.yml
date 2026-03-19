@@ -1,0 +1,3 @@
+name: nebra-ttn-gateway
+type: sw.application
+description: Nebra Indoor Gen 1 LoRa Basics Station for The Things Network
