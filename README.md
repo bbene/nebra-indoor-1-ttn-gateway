@@ -16,11 +16,22 @@ Repurposes a **Nebra Indoor Hotspot Gen 1** (the original CM3-based Helium miner
 ## Prerequisites
 
 - Nebra Indoor Hotspot Gen 1 (CM3-based, **not** the Rock Pi version)
-- Fresh Raspberry Pi OS Lite (64-bit) flashed to the CM3's eMMC via `rpiboot`
 - A TTN account with a registered gateway and LNS API key
 - Internet connection on the device
 
+### For Bare-Metal Deployment
+
+- Fresh Raspberry Pi OS Lite (64-bit) flashed to the CM3's eMMC via `rpiboot`
+
+### For balena Deployment
+
+- Device running [BalenaOS](https://www.balena.io/os/) with the CM3 SPI overlay enabled
+- A [balena account](https://www.balena.io/) and fleet created
+- `balena` CLI installed locally
+
 ## Quick Start
+
+### Option 1: Bare-Metal (systemd)
 
 ```bash
 git clone https://github.com/YOURUSER/nebra-ttn-gateway.git
@@ -38,6 +49,32 @@ The script will:
 7. Install and enable the `ttn-station` systemd service
 
 If SPI wasn't already enabled, it will offer to reboot automatically.
+
+### Option 2: Docker + balena (Recommended for OTA Updates)
+
+Deploy via balena for reproducible builds, OTA updates, and remote management:
+
+```bash
+git clone https://github.com/YOURUSER/nebra-ttn-gateway.git
+cd nebra-ttn-gateway
+balena push <fleet-name>
+```
+
+Then set environment variables in the balena dashboard:
+
+| Variable | Value | Scope |
+|----------|-------|-------|
+| `TTN_CLUSTER` | `nam1`, `eu1`, `au1`, etc. | Fleet |
+| `TTN_API_KEY` | Your TTN API key (NNSXS...) | **Device** (per-device secret) |
+
+Finally, enable SPI in balena device configuration:
+- Set `BALENA_HOST_CONFIG_dtoverlay` = `spi1-3cs`
+
+The container will:
+- Build `basicstation` and `sx1301_softreset` from source at image build time
+- Read TTN credentials from environment variables at startup
+- Access `/dev/spidev1.2` (SPI) and `/dev/gpiochip0` (GPIO) from the host
+- Run the Python launcher with full hardware control
 
 ## TTN Console Setup
 
@@ -87,15 +124,23 @@ After soft reset VERSION=0x67 (expect 0x67)
 
 ```
 nebra-ttn-gateway/
-├── setup.sh                        # Interactive setup script
+├── setup.sh                        # Bare-metal setup script
+├── start.sh                        # Python launcher (GPIO, LED, button)
 ├── src/
 │   └── sx1301_softreset.c          # SPI soft reset utility (see below)
 ├── config/
 │   └── station.conf                # Basics Station hardware config
 ├── systemd/
-│   └── ttn-station.service         # systemd unit file
+│   └── ttn-station.service         # systemd unit file (bare-metal)
+├── Dockerfile                      # Multi-stage Docker build (balena)
+├── docker-entrypoint.sh            # Credential initialization (balena)
+├── docker-compose.yml              # Service config (local testing)
+├── balena.yml                      # balena project metadata
+├── .balenaignore                   # balena build artifact exclusion
 └── README.md
 ```
+
+### Bare-Metal Runtime
 
 The setup script writes the following to `/opt/ttn-station/`:
 
@@ -108,6 +153,10 @@ The setup script writes the following to `/opt/ttn-station/`:
 ├── tc.key              # API key (600 permissions)
 └── tc.trust            # CA certificate
 ```
+
+### Container Runtime (balena)
+
+The Dockerfile creates the same structure inside the container at `/opt/ttn-station/`, with credentials written by `docker-entrypoint.sh` from environment variables at startup.
 
 ## Non-Obvious Hardware Quirks
 
